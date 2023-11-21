@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find Nearby Hotels</title>
+    <!-- Include Leaflet CSS and JavaScript -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <!-- Include Leaflet plugins for geolocation and OSM -->
+    <script src="https://unpkg.com/leaflet.locatecontrol@0.74.0/dist/L.Control.Locate.min.js"></script>
+</head>
+<body>
+    <!-- Create a map container that covers the entire viewport -->
+    <div id="map" style="position: absolute; top: 0; bottom: 0; left: 0; right: 0;"></div>
+
+    <!-- Create a button to find nearby hotels -->
+    <button id="findHotels" style="position: absolute; top: 10px; left: 10px; z-index: 1000;">Find Hotels</button>
+
+    <script>
+        // Initialize a Leaflet map
+        const map = L.map('map').setView([0, 0], 13);
+
+        // Add an OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Add a button for geolocation
+        L.control.locate().addTo(map);
+
+        // Listen for locationfound event when the user's location is found
+        map.on('locationfound', (e) => {
+            const userLatitude = e.latitude;
+            const userLongitude = e.longitude;
+
+            // Display the user's location on the map
+            L.marker([userLatitude, userLongitude]).addTo(map)
+                .bindPopup('You are here!').openPopup();
+        });
+
+        // Add a click event listener to the "Find Hotels" button
+        document.getElementById('findHotels').addEventListener('click', () => {
+            // Clear the map before adding hotel markers
+            map.eachLayer((layer) => {
+                if (layer instanceof L.Marker) {
+                    map.removeLayer(layer);
+                }
+            });
+
+            // Fetch nearby hotels using OpenStreetMap Nominatim API
+            fetch(`https://cors-anywhere.herokuapp.com/https://nominatim.openstreetmap.org/reverse?lat=${map.getCenter().lat}&lon=${map.getCenter().lng}&format=json`)
+                .then((response) => response.json())
+                .then((data) => {
+                    const city = data.address.city;
+                    const apiUrl = `https://cors-anywhere.herokuapp.com/https://nominatim.openstreetmap.org/search?format=json&city=${city}&amenity=hotel&limit=10`;
+
+                    fetch(apiUrl)
+                        .then((response) => response.json())
+                        .then((hotels) => {
+                            // Display nearby hotels on the map
+                            hotels.forEach((hotel) => {
+                                const hotelName = hotel.display_name;
+                                const hotelLat = hotel.lat;
+                                const hotelLon = hotel.lon;
+
+                                L.marker([hotelLat, hotelLon]).addTo(map)
+                                    .bindPopup(hotelName);
+                            });
+                        })
+                        .catch((error) => console.error('Error fetching nearby hotels:', error));
+                })
+                .catch((error) => console.error('Error fetching city:', error));
+        });
+
+        // Locate the user's position and make the map fullscreen
+        map.locate({ setView: true, maxZoom: 16 });
+    </script>
+</body>
+</html>
